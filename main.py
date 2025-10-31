@@ -11,6 +11,7 @@ st.sidebar.header("📂 CSV 파일 업로드")
 pop_file = st.sidebar.file_uploader("노인 및 독거노인 인구수 CSV 업로드", type=["csv"])
 facility_file = st.sidebar.file_uploader("노인복지시설현황 CSV 업로드", type=["csv"])
 
+# CSV 읽기 안전 처리
 def read_csv_safe(file):
     try:
         return pd.read_csv(file, encoding="utf-8")
@@ -44,18 +45,22 @@ if pop_file and facility_file:
     pop_df[pop_x] = pop_df[pop_x].astype(str).str.strip().str.lower()
     fac_df[fac_x] = fac_df[fac_x].astype(str).str.strip().str.lower()
 
-    # 단순히 일치하는 경우만 매칭, 안 맞으면 빈칸
+    # 단순 일치하는 경우만 매칭, 안 맞으면 빈 문자열
     pop_df["매칭지역"] = pop_df[pop_x].apply(lambda x: x if x in fac_df[fac_x].values else "")
 
     # 숫자형 변환
     pop_df[pop_y] = pd.to_numeric(pop_df[pop_y], errors="coerce")
     fac_df[fac_y] = pd.to_numeric(fac_df[fac_y], errors="coerce")
 
-    # 매칭 성공한 데이터만 병합
-    pop_matched = pop_df[pop_df["매칭지역"] != ""].copy()
-    fac_df_nonnull = fac_df[[fac_x, fac_y]].copy()
+    # NaN, 빈 문자열 제거
+    pop_matched = pop_df[[pop_y, "매칭지역"]].dropna(subset=[pop_y, "매칭지역"])
+    pop_matched = pop_matched[pop_matched["매칭지역"] != ""]
+    fac_df_nonnull = fac_df[[fac_x, fac_y]].dropna(subset=[fac_x, fac_y])
+    fac_df_nonnull = fac_df_nonnull[fac_df_nonnull[fac_x] != ""]
+
+    # 안전한 병합
     merged = pd.merge(
-        pop_matched[[pop_y, "매칭지역"]],
+        pop_matched,
         fac_df_nonnull,
         left_on="매칭지역",
         right_on=fac_x,
